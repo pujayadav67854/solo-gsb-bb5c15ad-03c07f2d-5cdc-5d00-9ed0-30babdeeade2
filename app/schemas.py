@@ -4,13 +4,26 @@ from typing import Annotated, List, Literal, Optional
 
 from pydantic import BaseModel, Field, RootModel, model_validator
 
+# SQLite INTEGER stores signed 64-bit values exactly; anything outside this
+# range would overflow at write time. ``strict=True`` also rejects bools,
+# floats and numeric strings instead of coercing them (pydantic's lax int
+# mode accepts all three).
+INT64_MIN = -(2**63)
+INT64_MAX = 2**63 - 1
+
+# Strict signed 64-bit integer for client-supplied points: JSON ints only,
+# within [-2**63, 2**63 - 1]. Bools/floats/strings/out-of-range all raise 422.
+PointsInt = Annotated[
+    int, Field(strict=True, ge=INT64_MIN, le=INT64_MAX)
+]
+
 
 class EventIn(BaseModel):
     """Write model for a points event (immutable once accepted)."""
 
     event_id: str = Field(min_length=1, max_length=128)
     participant_id: str = Field(min_length=1, max_length=128)
-    points: int
+    points: PointsInt
     correction_of: Optional[str] = Field(
         default=None,
         description="event_id of an existing event this event corrects; "
